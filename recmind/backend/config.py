@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     YOUTUBE_API_KEY: str | None = None
     DATA_DIR: str = os.getenv("DATA_DIR", "./data/raw")
     MAX_PER_SOURCE: int = 100
+    mongo_url: str
+    db_name: str
 
 
     class Config:

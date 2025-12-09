@@ -16,3 +16,4 @@ pytest
 httpx
 pydantic-settings
 pymongo
+lightfm

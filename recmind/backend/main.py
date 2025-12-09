@@ -7,6 +7,7 @@ from backend.recommender.search import search
 from backend.recommender.builder import build_index
 import asyncio
 import concurrent.futures
+from backend.recommender.routes import router as rec_router
 
 settings = get_settings()
 app = FastAPI(title="recmind-ingestion")
@@ -77,6 +78,8 @@ def search_api(topic: str, q: str, k: int = 20):
         }
         for r in results
     ]
+
+app.include_router(rec_router)
 
 if __name__ == "__main__":
     import uvicorn

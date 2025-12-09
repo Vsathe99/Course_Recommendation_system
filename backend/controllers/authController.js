@@ -8,12 +8,24 @@ export const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
     const existing = await User.findOne({ email });
-    if (existing) return res.status(400).json({ message: "User already exists" });
+    if (existing) {
+      if (!existing.verified) {
+        return res.status(400).json({ message: "Email registered but not verified. Check your email for code." });
+      }
+      return res.status(400).json({ message: "User already exists" });
+    }
 
     const hashed = await bcrypt.hash(password, 10);
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-    const user = await User.create({ name, email, password: hashed, verificationCode });
+    const user = await User.create({
+      name,
+      email,
+      password: hashed,
+      verificationCode,
+      verified: false, // New field
+    });
+
     await sendVerificationEmail(email, verificationCode);
 
     res.status(201).json({ message: "Registered! Check your email for verification code." });

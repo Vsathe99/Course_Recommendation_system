@@ -65,7 +65,7 @@ def search_repos(topic: str, max_items: int = 30) -> List[Dict]:
             "topics": repo.get("topics", []),
             "stars": repo.get("stargazers_count"),
             "language": repo.get("language"),
-            "html_url": repo.get("html_url"),
+            "url": repo.get("html_url"),
         })
 
     return items[:max_items]
