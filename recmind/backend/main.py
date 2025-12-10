@@ -54,12 +54,48 @@ async def ingest(topic: str = Query(..., min_length=1)):
         "youtube_path": yt_path,
     }
 
+
 @app.post("/build_index")
-def build_index_api(topic: str, source: str):
-    
+def build_index_api(topic: str):
+    """
+    Build/extend FAISS index for a topic using BOTH sources:
+    - github
+    - youtube
+
+    Requires that /ingest has already run for this topic.
+    """
     faiss_path = f"data/faiss/{topic}.index"
-    count = build_index(topic, source, faiss_path)
-    return {"topic": topic, "source": source, "indexed": count}
+
+    total_indexed = 0
+    results = {}
+
+    for source in ["github", "youtube"]:
+        try:
+            count = build_index(topic, source, faiss_path)
+            results[source] = count
+            total_indexed += count
+        except FileNotFoundError:
+            # If parquet for a source doesn't exist, just skip it
+            results[source] = 0
+
+    if total_indexed == 0:
+        return {
+            "ok": False,
+            "topic": topic,
+            "detail": (
+                f"No data found for topic '{topic}' in any source. "
+                "Run /ingest?topic=... first."
+            ),
+            "indexed": results,
+        }
+
+    return {
+        "ok": True,
+        "topic": topic,
+        "indexed": results,
+        "total_indexed": total_indexed,
+        "faiss_path": faiss_path,
+    }
 
 @app.get("/search")
 def search_api(topic: str, q: str, k: int = 20):

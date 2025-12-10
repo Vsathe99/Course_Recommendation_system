@@ -24,7 +24,7 @@ class ZeroShotRanker:
 
     - Uses FAISS to get top-k candidates by vector similarity.
     - Optionally mixes in a simple popularity score from Mongo.
-    - Returns a dict {item_id: score}.
+    - Returns a dict {mongo_item_id (str): score}.
     """
 
     def __init__(self, faiss_store: FaissStore, w1: float = 1.0, w2: float = 0.2):
@@ -49,55 +49,64 @@ class ZeroShotRanker:
 
         Steps:
         - Embed query
-        - Search FAISS for top-k most similar items
-        - Fetch those items from Mongo
+        - Search FAISS for top-k most similar items (numeric IDs)
+        - Map numeric IDs -> Mongo docs
         - Combine embedding score + popularity into a final score
 
         Returns:
-            Dict[item_id (str), score (float)]
+            Dict[mongo_item_id (str), score (float)]
         """
         # 1. Embed the query (shape: (embed_dim,))
         qvec = embed_texts([query])[0]
 
-        # 2. Search FAISS index: returns list of (item_id, similarity_score)
+        # 2. Search FAISS index: returns list of (faiss_numeric_id, distance)
         results = self.faiss.search(qvec, k=k)
         if not results:
             return {}
 
-        item_ids: List[str] = [r[0] for r in results]
+        # Filter out invalid slots (-1, max_float)
+        filtered: List[tuple[int, float]] = [
+            (int(i), float(d))
+            for i, d in results
+            if i != -1
+        ]
+        if not filtered:
+            return {}
 
-        # 3. Fetch items from DB (for popularity, titles, etc.)
-        items = db.get_items_by_ids(item_ids)
-        if not items:
-            # No metadata found – just return embedding scores
-            return {item_ids[i]: float(results[i][1]) for i in range(len(item_ids))}
-
-        # Map id → item for quick lookup
-        item_map = {str(it["_id"]): it for it in items}
-
-        # 4. Build arrays for popularity & embedding sim
+        # 3. Resolve numeric_id -> Mongo doc
+        # (we'll use your existing helper get_item_by_numeric_id)
         sims = []
         pops = []
+        mongo_ids: List[str] = []
 
-        filtered_ids: List[str] = []
-        for iid, sim in results:
-            doc = item_map.get(str(iid))
+        for num_id, dist in filtered:
+            doc = db.get_item_by_numeric_id(num_id)
             if not doc:
                 continue
-            filtered_ids.append(str(iid))
-            sims.append(float(sim))
+            if doc.get("topic") != topic:
+                continue
+
+            mongo_id_str = str(doc["_id"])
+            mongo_ids.append(mongo_id_str)
+
+            # FAISS gives L2 distance: smaller is better.
+            # Convert to similarity by negating distance.
+            sims.append(-float(dist))
+
+            # Popularity from doc (stars / viewCount)
             pops.append(float(doc.get("popularity", 0.0)))
 
-        if not filtered_ids:
+        if not mongo_ids:
             return {}
 
         sims = np.array(sims, dtype=float)
         pops = np.array(pops, dtype=float)
 
-        # 5. Normalize popularity to [0, 1]
+        # 4. Normalize popularity to [0, 1]
         pops_norm = _minmax(pops)
 
-        # 6. Final zero-shot score
+        # 5. Final zero-shot score (higher is better)
+        # You could also min-max sims, but negating distance already helps.
         zs = self.w1 * sims + self.w2 * pops_norm
 
-        return {filtered_ids[i]: float(zs[i]) for i in range(len(filtered_ids))}
+        return {mongo_ids[i]: float(zs[i]) for i in range(len(mongo_ids))}
