@@ -1,0 +1,36 @@
+/* src/index.css */
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+
+@layer utilities {
+  .border-fade {
+    position: relative;
+    border-radius: 20px;
+  }
+
+  .border-fade::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    
+
+    /* Border size */
+    border: 3px solid transparent;
+
+    /* Apply gradient only to border */
+    border-image: linear-gradient(
+      to bottom,
+      #ff79c6 0%,     /* pink at top */
+      #060010 100%   /* black at bottom */
+    ) 1;
+
+    /* Ensures inside area stays untouched */
+    background: none;
+  }
+}
+
