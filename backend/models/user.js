@@ -6,7 +6,14 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   verified: { type: Boolean, default: false },
   verificationCode: { type: String },
-  refreshToken: { type: String }
+  refreshToken: { type: String },
+  provider: {
+  type: String,
+  enum: ["local", "google", "github"],
+  default: "local",
+  },
+  providerId: {type: String},
+  avatar: {type: String}
 });
 
 export default mongoose.model("User", userSchema);

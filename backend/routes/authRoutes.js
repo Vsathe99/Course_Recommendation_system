@@ -1,6 +1,16 @@
 import express from "express";
 import { body } from "express-validator";
-import { register, verifyEmail, login, refreshToken, logout } from "../controllers/authController.js";
+import {
+  register,
+  verifyEmail,
+  login,
+  refreshToken,
+  logout,
+  googleAuth,
+  googleCallback,
+  githubAuth,
+  githubCallback,
+} from "../controllers/auth.controller.js";
 
 const router = express.Router();
 
@@ -57,5 +67,12 @@ router.post("/refresh", refreshToken);
 
 // Logout (no body validation needed)
 router.post("/logout", logout);
+
+
+router.get("/google", googleAuth);
+router.get("/google/callback", googleCallback);
+
+router.get("/github", githubAuth);
+router.get("/github/callback", githubCallback);
 
 export default router;
