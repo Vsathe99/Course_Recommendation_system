@@ -77,7 +77,7 @@ export const login = async (req, res) => {
 
 export const refreshToken = async (req, res) => {
   const token = req.cookies.refreshToken;
-  if (!token) return res.status(401).json({ message: "No refresh token" });
+  if (!token) return res.status(401).json({ message: "No refresh token" });P
 
   try {
     const decoded = jwt.verify(token, process.env.REFRESH_SECRET);
@@ -230,5 +230,13 @@ export const githubCallback = async (req, res) => {
     res.redirect(`http://localhost:3000/oauth-success?token=${accessToken}`);
   } catch (err) {
     res.status(500).json({ message: "GitHub authentication failed" });
+  }
+};
+
+export const authMe = async (req, res) => {
+  try {
+    res.json(req.user);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch user" });
   }
 };

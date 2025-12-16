@@ -10,7 +10,9 @@ import {
   googleCallback,
   githubAuth,
   githubCallback,
+  authMe
 } from "../controllers/auth.controller.js";
+import { protect } from "../middlewares/auth.middleware.js";
 
 const router = express.Router();
 
@@ -74,5 +76,7 @@ router.get("/google/callback", googleCallback);
 
 router.get("/github", githubAuth);
 router.get("/github/callback", githubCallback);
+
+router.get("/me", protect, authMe);
 
 export default router;
