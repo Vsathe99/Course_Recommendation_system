@@ -11,8 +11,8 @@ import {
   githubAuth,
   githubCallback,
   authMe
-} from "../controllers/auth.controller.js";
-import { protect } from "../middlewares/auth.middleware.js";
+} from "../controllers/authController.js";
+import { protect } from "../middleware/authMiddleware.js"
 
 const router = express.Router();
 

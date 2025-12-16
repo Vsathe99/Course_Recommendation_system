@@ -9,32 +9,48 @@ import { googleConfig, githubConfig } from "../config/oauth.js";
 export const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
+
     const existing = await User.findOne({ email });
-    if (existing) {
-      if (!existing.verified) {
-        return res.status(400).json({ message: "Email registered but not verified. Check your email for code." });
-      }
-      return res.status(400).json({ message: "User already exists" });
+
+    // 🔁 User exists but not verified
+    if (existing && !existing.verified) {
+      return res.status(409).json({
+        message: "Email registered but not verified",
+        requiresVerification: true,
+        email: existing.email,
+      });
+    }
+
+    if (existing && existing.verified) {
+      return res.status(400).json({
+        message: "User already exists",
+      });
     }
 
     const hashed = await bcrypt.hash(password, 10);
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
 
-    const user = await User.create({
+    await User.create({
       name,
       email,
       password: hashed,
       verificationCode,
-      verified: false, // New field
+      verified: false,
     });
 
     await sendVerificationEmail(email, verificationCode);
 
-    res.status(201).json({ message: "Registered! Check your email for verification code." });
+    res.status(201).json({
+      message: "Registered! Check your email for verification code.",
+      requiresVerification: true,
+      email,
+    });
+
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
+
 
 export const verifyEmail = async (req, res) => {
   try {
@@ -109,39 +125,63 @@ export const logout = async (req, res) => {
 /* ================= GOOGLE ================= */
 
 export const googleAuth = (req, res) => {
-  const url =
-    `https://accounts.google.com/o/oauth2/v2/auth?` +
-    `client_id=${googleConfig.clientId}` +
-    `&redirect_uri=${googleConfig.redirectUri}` +
-    `&response_type=code` +
-    `&scope=profile email`;
+  try {
+    const redirectUrl =
+      "https://accounts.google.com/o/oauth2/v2/auth" +
+      `?client_id=${process.env.GOOGLE_CLIENT_ID}` +
+      `&redirect_uri=${encodeURIComponent(process.env.GOOGLE_REDIRECT_URI)}` +
+      `&response_type=code` +
+      `&scope=profile email`;
 
-  res.redirect(url);
+    console.log("GOOGLE AUTH URL:", redirectUrl); // debug
+
+    res.redirect(redirectUrl);
+  } catch (err) {
+    console.error("Google Auth Error:", err);
+    res.status(500).json({ message: "Google auth failed" });
+  }
 };
 
 export const googleCallback = async (req, res) => {
   try {
     const { code } = req.query;
 
+    if (!code) {
+      return res.status(400).json({ message: "Authorization code missing" });
+    }
+
+    console.log("Auth code received:", code);
+
+    const params = new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET,
+      redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+      grant_type: "authorization_code",
+      code,
+    });
+
     const tokenRes = await axios.post(
       "https://oauth2.googleapis.com/token",
+      params,
       {
-        client_id: googleConfig.clientId,
-        client_secret: googleConfig.clientSecret,
-        redirect_uri: googleConfig.redirectUri,
-        grant_type: "authorization_code",
-        code,
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
       }
     );
 
     const { access_token } = tokenRes.data;
 
-    const profile = await axios.get(
+    const profileRes = await axios.get(
       "https://www.googleapis.com/oauth2/v2/userinfo",
-      { headers: { Authorization: `Bearer ${access_token}` } }
+      {
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+        },
+      }
     );
 
-    const { id, email, name, picture } = profile.data;
+    const { id, email, name, picture } = profileRes.data;
 
     let user = await User.findOne({ email });
 
@@ -159,63 +199,116 @@ export const googleCallback = async (req, res) => {
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    user.refreshToken = refreshToken;
-    await user.save();
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      sameSite: "lax",
+    });
 
-    res.cookie("refreshToken", refreshToken, { httpOnly: true });
-    res.redirect(`http://localhost:3000/oauth-success?token=${accessToken}`);
+    res.redirect(
+      `${process.env.FRONTEND_URL}/oauth-success?token=${accessToken}`
+    );
+
   } catch (err) {
-    res.status(500).json({ message: "Google authentication failed" });
+    console.error("Google OAuth Error:", err.response?.data || err.message);
+    res.status(500).json({
+      message: "Google authentication failed",
+      error: err.response?.data || err.message,
+    });
   }
 };
+
+
 
 /* ================= GITHUB ================= */
 
 export const githubAuth = (req, res) => {
-  const url =
-    `https://github.com/login/oauth/authorize?` +
-    `client_id=${githubConfig.clientId}` +
-    `&redirect_uri=${githubConfig.redirectUri}` +
+  const clientId = process.env.GITHUB_CLIENT_ID;
+  const redirectUri = process.env.GITHUB_REDIRECT_URI;
+
+  console.log("GitHub Client ID:", clientId);
+  console.log("GitHub Redirect URI:", redirectUri);
+
+  const redirectUrl =
+    "https://github.com/login/oauth/authorize" +
+    `?client_id=${clientId}` +
+    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
     `&scope=user:email`;
 
-  res.redirect(url);
+  res.redirect(redirectUrl);
 };
+
 
 export const githubCallback = async (req, res) => {
   try {
     const { code } = req.query;
 
+    if (!code) {
+      return res.status(400).json({ message: "Authorization code missing" });
+    }
+
+    // 🔹 Exchange code for access token
     const tokenRes = await axios.post(
       "https://github.com/login/oauth/access_token",
       {
-        client_id: githubConfig.clientId,
-        client_secret: githubConfig.clientSecret,
+        client_id: process.env.GITHUB_CLIENT_ID,
+        client_secret: process.env.GITHUB_CLIENT_SECRET,
         code,
+        redirect_uri: process.env.GITHUB_REDIRECT_URI,
       },
-      { headers: { Accept: "application/json" } }
+      {
+        headers: {
+          Accept: "application/json", // VERY IMPORTANT
+        },
+      }
     );
 
     const { access_token } = tokenRes.data;
 
+    if (!access_token) {
+      return res.status(401).json({
+        message: "GitHub access token not received",
+        error: tokenRes.data,
+      });
+    }
+
+    // 🔹 Get user profile
     const userRes = await axios.get("https://api.github.com/user", {
-      headers: { Authorization: `Bearer ${access_token}` },
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+      },
     });
 
-    const emailRes = await axios.get("https://api.github.com/user/emails", {
-      headers: { Authorization: `Bearer ${access_token}` },
-    });
+    // 🔹 Get user email (GitHub may hide it)
+    const emailRes = await axios.get(
+      "https://api.github.com/user/emails",
+      {
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+        },
+      }
+    );
 
-    const email = emailRes.data.find(e => e.primary).email;
+    const primaryEmail = emailRes.data.find(
+      (e) => e.primary && e.verified
+    )?.email;
 
-    let user = await User.findOne({ email });
+    if (!primaryEmail) {
+      return res.status(400).json({
+        message: "GitHub email not available",
+      });
+    }
+
+    const { id, name, avatar_url } = userRes.data;
+
+    let user = await User.findOne({ email: primaryEmail });
 
     if (!user) {
       user = await User.create({
-        name: userRes.data.name || userRes.data.login,
-        email,
-        avatar: userRes.data.avatar_url,
+        name: name || "GitHub User",
+        email: primaryEmail,
+        avatar: avatar_url,
         provider: "github",
-        providerId: userRes.data.id,
+        providerId: id,
         verified: true,
       });
     }
@@ -223,13 +316,24 @@ export const githubCallback = async (req, res) => {
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    user.refreshToken = refreshToken;
-    await user.save();
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      sameSite: "lax",
+    });
 
-    res.cookie("refreshToken", refreshToken, { httpOnly: true });
-    res.redirect(`http://localhost:3000/oauth-success?token=${accessToken}`);
+    res.redirect(
+      `${process.env.FRONTEND_URL}/oauth-success?token=${accessToken}`
+    );
+
   } catch (err) {
-    res.status(500).json({ message: "GitHub authentication failed" });
+    console.error(
+      "GitHub OAuth Error:",
+      err.response?.data || err.message
+    );
+    res.status(500).json({
+      message: "GitHub authentication failed",
+      error: err.response?.data || err.message,
+    });
   }
 };
 
