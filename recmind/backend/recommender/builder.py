@@ -5,7 +5,11 @@ from bson import ObjectId
 
 from backend.core.embedding import embed_texts
 from backend.core.faiss_store import FaissStore
-from backend.core.db import insert_item, items_col
+from backend.core.db import insert_item, set_item_numeric_id
+from backend.config import get_settings
+
+
+settings = get_settings()
 
 
 def _safe_col(df: pd.DataFrame, name: str) -> pd.Series:
@@ -26,7 +30,7 @@ def build_index(topic: str, source: str, faiss_path: str) -> int:
         number of items indexed for this call.
         If 0, nothing was added (empty parquet or no usable rows).
     """
-    parquet_path = f"data/raw/{source}/{topic}.parquet"
+    parquet_path = os.path.join(settings.RAW_DATA_DIR, source, f"{topic}.parquet")
     if not os.path.exists(parquet_path):
         raise FileNotFoundError(f"Missing parquet file: {parquet_path}")
 
@@ -93,11 +97,8 @@ def build_index(topic: str, source: str, faiss_path: str) -> int:
         numeric_id = int(str(inserted_id)[-8:], 16) % (10**8)
 
         # Persist numeric_id on the same document
-        items_col.update_one(
-            {"_id": ObjectId(inserted_id)},
-            {"$set": {"numeric_id": numeric_id}},
-        )
-
+        set_item_numeric_id(inserted_id, numeric_id)
+        
         # Add to FAISS ids list
         ids.append(numeric_id)
 
