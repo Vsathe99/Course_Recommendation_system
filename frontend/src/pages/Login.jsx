@@ -28,7 +28,7 @@ const Login = () => {
       const user = await fetchMe();
       dispatch(setUser(user));
 
-      navigate("/chat/home");
+      navigate("/chat");
     } catch (err) {
       setError(
         err.response?.data?.message || "Invalid email or password"
