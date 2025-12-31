@@ -19,7 +19,13 @@ export default function ResultCard ({ item, onToggleLiked, onToggleSaved, onSetR
           </div>
 
           <p className="text-slate-600 text-sm leading-relaxed mb-3">
-            {item.description}
+            {item.desc}
+          </p>
+          <p className="text-slate-600 text-sm leading-relaxed mb-3">
+            {item.url}
+          </p>
+          <p className="text-slate-600 text-sm leading-relaxed mb-3">
+            user recommended: {item.used_cf}
           </p>
 
           <div className="flex items-center gap-1.5">
@@ -27,6 +33,7 @@ export default function ResultCard ({ item, onToggleLiked, onToggleSaved, onSetR
             <span className="text-sm font-medium text-slate-900">{item.rating}</span>
             <span className="text-xs text-slate-500">/ 5</span>
           </div>
+
         </div>
 
         <div className="flex lg:flex-col items-center lg:items-end gap-2 lg:gap-3 pt-2 lg:pt-0 border-t lg:border-t-0 lg:border-l border-slate-200 lg:pl-4">

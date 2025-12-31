@@ -1,7 +1,8 @@
 import { useState, useRef } from "react";
 import { Heart, Bookmark, Star, Send, Search, Sparkles } from "lucide-react";
 import AnimatedList from "@/components/AnimatedList/AnimatedList";
-
+import { getRecommendations, logInteraction } from "@/api/user";
+import { useSelector } from "react-redux";
 
 
 const TopicExplorer = () => {
@@ -12,45 +13,49 @@ const TopicExplorer = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [hideInputBar, setHideInputBar] = useState(false);
   const lastScrollTop = useRef(0);
+  const userId = useSelector((state) => state.user?.user?._id);
+  console.log("userId:", userId);
 
 
   const handleSubmit = async () => {
-    setIsLoading(true);
+  if (!topic || !userId) return;
 
-    const requestPayload = {
-      topic: topic,
-      subtopic: subtopic,
-      extraInfo: extraInfo,
-      timestamp: new Date().toISOString(),
-    };
+  setIsLoading(true);
+  
 
-    try {
-      const response = await fetch("/api/explore", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestPayload),
-      });
+  try {
+    const query = [subtopic, extraInfo].filter(Boolean).join(" ");
 
-      const data = await response.json();
+    const data = await getRecommendations({
+      userId,
+      topic,
+      query,
+    });
 
-      const formattedResults = data.results.map((item) => ({
-        ...item,
-        liked: false,
-        saved: false,
-        userRating: null,
-      }));
+    const formatted = data.map((item) => ({
+      id: item.id, // ideally Mongo _id
+      name: item.title,
+      desc: item.desc,
+      url: item.url,
+      source: item.source,
+      score: item.score,
+      used_cf: item.used_cf,
+      liked: false,
+      saved: false,
+      userRating: null,
+      _enterTs: Date.now(),
+    }));
 
-      setResults(formattedResults);
-    } catch (error) {
-      console.error("Error fetching results:", error);
-      const mockResults = generateMockResults();
-      setResults(mockResults);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    setResults(formatted);
+  } catch (err) {
+    console.error("RAG error:", err);
+    const mockResults = generateMockResults();
+    setResults(mockResults);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   const generateMockResults = () => {
     const sources = [
@@ -88,28 +93,44 @@ const TopicExplorer = () => {
     }));
   };
 
-  const toggleLiked = (id) => {
+  const toggleLiked = async (id) => {
     setResults((prev) =>
       prev.map((item) =>
         item.id === id ? { ...item, liked: !item.liked } : item
       )
     );
+
+    await logInteraction({
+    userId,
+    itemId: id,
+    event: "like",
+  });
   };
 
-  const toggleSaved = (id) => {
+  const toggleSaved = async (id) => {
     setResults((prev) =>
       prev.map((item) =>
         item.id === id ? { ...item, saved: !item.saved } : item
       )
     );
+    await logInteraction({
+    userId,
+    itemId: id,
+    event: "save",
+  });
   };
 
-  const setUserRating = (id, rating) => {
+  const setUserRating = async (id, rating) => {
     setResults((prev) =>
       prev.map((item) =>
         item.id === id ? { ...item, userRating: rating } : item
       )
     );
+    await logInteraction({
+    userId,
+    itemId: id,
+    event: `rate:${rating}`,
+  });
   };
 
   return (

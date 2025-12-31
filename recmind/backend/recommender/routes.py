@@ -144,10 +144,12 @@ def recommendations(
     id_map = {str(it["_id"]): it for it in items}
 
     return [
-        {
+        { 
+            "id": str(id_map[i]["_id"]),
             "title": id_map[i]["title"],
             "url": id_map[i]["url"],
             "source": id_map[i]["source"],
+            "desc": id_map[i].get("desc", ""),
             "score": s,
             "used_cf": use_cf,
         }
