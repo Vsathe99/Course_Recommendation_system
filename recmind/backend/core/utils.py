@@ -22,10 +22,16 @@ def write_parquet(records: list[dict], source: str, topic: str) -> str:
     Creates an empty DataFrame with 'ext_id' column if records are empty.
     Returns the path to the saved Parquet file.
     """
+    print("DATA_DIR =", settings.DATA_DIR)
+    print("CWD =", os.getcwd())
+
     path = ensure_data_dir(source, topic)
+    print("PARQUET PATH =", path)
+
     if not records:
         df = pd.DataFrame(columns=["ext_id"])
     else:
         df = pd.DataFrame.from_records(records)
+
     df.to_parquet(path, index=False)
     return str(path)

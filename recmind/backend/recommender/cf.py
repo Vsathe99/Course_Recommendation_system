@@ -1,9 +1,9 @@
 # backend/recommender/cf.py
 
-import os
 import pickle
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
+from pathlib import Path
 
 import numpy as np
 from scipy import sparse
@@ -13,18 +13,15 @@ from lightfm import LightFM
 from backend.core import db
 from backend.core.embedding import embed_texts
 from backend.core.faiss_store import FaissStore
+from backend.core.paths import MODEL_DIR
 
-MODEL_DIR = "data/models"
-os.makedirs(MODEL_DIR, exist_ok=True)
+# ensure directory exists
+MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
 
 class CFModel:
     """
     LightFM-based collaborative filtering model, per topic.
-
-    - Trains on user-item interaction matrix (click, like, complete, etc.)
-    - Uses item content embeddings (from embed_texts) as item features.
-    - Model is stored on disk as a pickle per topic.
     """
 
     def __init__(self, topic: str, faiss_store: FaissStore):
@@ -35,29 +32,24 @@ class CFModel:
         self.pca: Optional[PCA] = None
         self.user_index: Dict[str, int] = {}
         self.item_index: Dict[str, int] = {}
-        self.rev_item_index: List[str] = []  # index → item_id
+        self.rev_item_index: List[str] = []
 
     # -------------------------
     # Paths & status helpers
     # -------------------------
 
-    def _model_path(self) -> str:
+    def _model_path(self) -> Path:
         safe = self.topic.replace("/", "_")
-        return os.path.join(MODEL_DIR, f"lightfm_{safe}.pkl")
+        return MODEL_DIR / f"{safe}.pkl"
 
     def is_trained(self) -> bool:
-        """Return True if there is a saved model for this topic."""
-        return os.path.exists(self._model_path())
+        return self._model_path().exists()
 
     def is_stale(self, days: int = 15) -> bool:
-        """
-        Return True if the saved model file exists and its mtime is older than `days`.
-        Used so the API can decide when to retrain in the background.
-        """
         path = self._model_path()
-        if not os.path.exists(path):
+        if not path.exists():
             return False
-        mtime = datetime.utcfromtimestamp(os.path.getmtime(path))
+        mtime = datetime.utcfromtimestamp(path.stat().st_mtime)
         return datetime.utcnow() - mtime > timedelta(days=days)
 
     # -------------------------
@@ -65,14 +57,6 @@ class CFModel:
     # -------------------------
 
     def _load_interactions(self):
-        """
-        Build user-item interaction matrix (LightFM input) from MongoDB.
-        Returns:
-            X      : scipy.sparse matrix (num_users x num_items)
-            uidx   : {user_id -> row index}
-            iidx   : {item_id -> col index}
-            item_ids: list of item_ids in column order
-        """
         inters = db.get_interactions_by_topic(self.topic)
         items = db.get_items_by_topic(self.topic)
 
@@ -84,7 +68,6 @@ class CFModel:
 
         rows, cols, vals = [], [], []
 
-        # simple event → weight mapping
         wmap = {
             "impression": 0.1,
             "click": 1,
@@ -93,10 +76,10 @@ class CFModel:
         }
 
         for r in inters:
-            item_id_str = str(r["item_id"])
-            if item_id_str in iidx:
+            iid = str(r["item_id"])
+            if iid in iidx:
                 rows.append(uidx[r["user_id"]])
-                cols.append(iidx[item_id_str])
+                cols.append(iidx[iid])
                 vals.append(wmap.get(r["event"], 1))
 
         X = sparse.coo_matrix(
@@ -107,10 +90,6 @@ class CFModel:
         return X, uidx, iidx, item_ids
 
     def _build_item_features(self, item_ids: List[str]) -> sparse.csr_matrix:
-        """
-        Build item feature matrix using content embeddings (title + desc),
-        then compress with PCA for LightFM.
-        """
         items = db.get_items_by_ids(item_ids)
 
         texts = [
@@ -118,10 +97,8 @@ class CFModel:
             for it in items
         ]
 
-        # Embedding matrix: shape (num_items, embed_dim)
         vecs = embed_texts(texts)
 
-        # Reduce dimensionality for LightFM
         k = min(50, vecs.shape[1])
         self.pca = PCA(n_components=k, random_state=42)
         feats = self.pca.fit_transform(vecs)
@@ -133,10 +110,6 @@ class CFModel:
     # -------------------------
 
     def fit(self):
-        """
-        Train LightFM on current interactions for this topic,
-        with item content features. Overwrites any existing model on disk.
-        """
         X, uidx, iidx, item_ids = self._load_interactions()
 
         self.user_index = uidx
@@ -150,6 +123,7 @@ class CFModel:
             no_components=64,
             random_state=42,
         )
+
         self.model.fit(
             X.tocsr(),
             item_features=item_features,
@@ -168,19 +142,16 @@ class CFModel:
             "rev_item_index": self.rev_item_index,
             "pca": self.pca,
         }
-        with open(self._model_path(), "wb") as f:
+
+        with self._model_path().open("wb") as f:
             pickle.dump(payload, f)
 
     def load(self) -> bool:
-        """
-        Load a previously saved model for this topic.
-        Returns True if load was successful, False otherwise.
-        """
         path = self._model_path()
-        if not os.path.exists(path):
+        if not path.exists():
             return False
 
-        with open(path, "rb") as f:
+        with path.open("rb") as f:
             p = pickle.load(f)
 
         self.topic = p["topic"]
@@ -196,36 +167,33 @@ class CFModel:
     # Predict
     # -------------------------
 
-    def predict(self, user_id: str, candidate_ids: List[str]) -> Optional[Dict[str, float]]:
-        """
-        Predict scores for given candidate item IDs for a user.
+    def predict(
+        self,
+        user_id: str,
+        candidate_ids: List[str],
+    ) -> Optional[Dict[str, float]]:
 
-        - If no trained model exists → returns None (so caller can fall back to RAG only).
-        - If trained model exists but no candidate IDs overlap with known items → returns None.
-        """
-        # Ensure model is loaded
-        if self.model is None:
-            if not self.load():
-                # No trained model on disk for this topic
-                return None
+        if self.model is None and not self.load():
+            return None
 
-        # Build item feature matrix for all items the model knows (rev_item_index)
         items = db.get_items_by_ids(self.rev_item_index)
         texts = [
             f"{it.get('title', '')} {it.get('desc', '')}"
             for it in items
         ]
+
         vecs = embed_texts(texts)
         item_features = sparse.csr_matrix(self.pca.transform(vecs))
 
-        # Map user_id to model index (unseen users get new index)
         uidx = self.user_index.get(user_id, len(self.user_index))
 
-        # Map candidate IDs to indices used by model
-        idxs = [self.item_index.get(cid) for cid in candidate_ids if cid in self.item_index]
+        idxs = [
+            self.item_index[cid]
+            for cid in candidate_ids
+            if cid in self.item_index
+        ]
 
         if not idxs:
-            # None of the candidates are in the CF model's item_index
             return None
 
         scores = self.model.predict(
@@ -234,14 +202,7 @@ class CFModel:
             item_features=item_features,
         )
 
-        out: Dict[str, float] = {}
-        j = 0
-        for cid in candidate_ids:
-            if cid in self.item_index:
-                out[cid] = float(scores[j])
-                j += 1
-            else:
-                # candidate not present in CF model – leave it without CF score
-                out[cid] = 0.0
-
-        return out
+        return {
+            cid: float(scores[i]) if cid in self.item_index else 0.0
+            for i, cid in enumerate(candidate_ids)
+        }

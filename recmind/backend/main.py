@@ -64,7 +64,7 @@ def build_index_api(topic: str):
 
     Requires that /ingest has already run for this topic.
     """
-    faiss_path = f"data/faiss/{topic}.index"
+    faiss_path = settings.FAISS_DIR / f"{topic}.index"
 
     total_indexed = 0
     results = {}

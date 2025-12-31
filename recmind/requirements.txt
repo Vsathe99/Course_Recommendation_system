@@ -1,19 +1,26 @@
+# ---- FORCE CPU TORCH (NO CUDA) ----
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.2.2+cpu
+
+# ---- API ----
 fastapi
 uvicorn[standard]
 httpx
 requests
 python-dotenv
-pandas
+pydantic-settings
+
+# ---- DATA ----
 pyarrow
+sqlmodel
+pymongo
+
+# ---- ML / RECOMMENDER ----
+sentence-transformers
+
+# ---- EXTERNAL ----
 google-api-python-client
 youtube-transcript-api
-sqlmodel
-faiss-cpu
-sentence-transformers
-scikit-learn
-numpy
+
+# ---- TESTING ----
 pytest
-httpx
-pydantic-settings
-pymongo
-lightfm

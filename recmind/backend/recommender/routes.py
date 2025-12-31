@@ -14,7 +14,13 @@ from backend.ingestion.youtube_client import search_videos, fetch_transcript
 from backend.recommender.builder import build_index
 from backend.recommender.zero_shot import ZeroShotRanker
 from backend.recommender.cf import CFModel
-from backend.recommender.rank import rank_hybrid
+from backend.recommender.rank import rank_hybrid 
+from backend.core.paths import (
+    RAW_GITHUB_DIR,
+    RAW_YOUTUBE_DIR,
+    FAISS_DIR,
+)
+
 
 router = APIRouter(prefix="", tags=["recommendations"])
 settings = get_settings()
@@ -33,9 +39,9 @@ def _run_full_rag_pipeline_for_topic(topic: str) -> None:
     # Here we always re-ingest for simplicity. If you want to skip
     # when existing, uncomment the early-return section.
 
-    gh_parquet = f"data/raw/github/{topic}.parquet"
-    yt_parquet = f"data/raw/youtube/{topic}.parquet"
-
+    gh_parquet = RAW_GITHUB_DIR / f"{topic}.parquet"
+    yt_parquet = RAW_YOUTUBE_DIR / f"{topic}.parquet" 
+    
     gh_results = search_repos(topic, max_per_source)
     yt_results = search_videos(topic, max_per_source)
 
@@ -61,7 +67,8 @@ def _run_full_rag_pipeline_for_topic(topic: str) -> None:
     write_parquet(yt_results, "youtube", topic)
 
     # --------- 2) BUILD / EXTEND FAISS INDEX ----------
-    faiss_path = f"data/faiss/{topic}.index"
+    
+    faiss_path = FAISS_DIR / f"{topic}.index"
     os.makedirs(os.path.dirname(faiss_path), exist_ok=True)
 
     # Build from both sources into a single index file
