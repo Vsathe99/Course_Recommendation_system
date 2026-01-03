@@ -1,8 +1,12 @@
 import { useState } from "react";
 import { Heart, Bookmark, Star, Send, Search, Sparkles } from "lucide-react";
 
-
-export default function ResultCard ({ item, onToggleLiked, onToggleSaved, onSetRating }) {
+export default function ResultCard({
+  item,
+  onToggleLiked,
+  onToggleSaved,
+  onSetRating,
+}) {
   const [ratingOpen, setRatingOpen] = useState(false);
 
   return (
@@ -25,15 +29,16 @@ export default function ResultCard ({ item, onToggleLiked, onToggleSaved, onSetR
             {item.url}
           </p>
           <p className="text-slate-600 text-sm leading-relaxed mb-3">
-            user recommended: {item.used_cf}
+            User recommended: {item.used_cf ? "Yes" : "No"}
           </p>
 
           <div className="flex items-center gap-1.5">
             <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-            <span className="text-sm font-medium text-slate-900">{item.rating}</span>
+            <span className="text-sm font-medium text-slate-900">
+              {item.rating}
+            </span>
             <span className="text-xs text-slate-500">/ 5</span>
           </div>
-
         </div>
 
         <div className="flex lg:flex-col items-center lg:items-end gap-2 lg:gap-3 pt-2 lg:pt-0 border-t lg:border-t-0 lg:border-l border-slate-200 lg:pl-4">
@@ -45,7 +50,9 @@ export default function ResultCard ({ item, onToggleLiked, onToggleSaved, onSetR
                 : "bg-white text-slate-600 border-slate-200 hover:border-green-300 hover:text-green-700"
             }`}
           >
-            <Bookmark className={`w-4 h-4 ${item.saved ? "fill-green-700" : ""}`} />
+            <Bookmark
+              className={`w-4 h-4 ${item.saved ? "fill-green-700" : ""}`}
+            />
             <span>{item.saved ? "Saved" : "Save"}</span>
           </button>
 
@@ -70,7 +77,9 @@ export default function ResultCard ({ item, onToggleLiked, onToggleSaved, onSetR
                   : "bg-white text-slate-600 border-slate-200 hover:border-amber-300 hover:text-amber-700"
               }`}
             >
-              <Star className={`w-4 h-4 ${item.userRating ? "fill-amber-700" : ""}`} />
+              <Star
+                className={`w-4 h-4 ${item.userRating ? "fill-amber-700" : ""}`}
+              />
               <span>{item.userRating ? `${item.userRating}/5` : "Rate"}</span>
             </button>
 
@@ -101,4 +110,4 @@ export default function ResultCard ({ item, onToggleLiked, onToggleSaved, onSetR
       </div>
     </div>
   );
-};
+}

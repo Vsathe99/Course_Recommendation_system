@@ -10,6 +10,7 @@ import compression from "compression";
 
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
+import userItemsRoutes from "./routes/userItems.js";
 
 /* -------------------- ENV VALIDATION -------------------- */
 const PORT = process.env.PORT || 5000;
@@ -49,6 +50,7 @@ if (NODE_ENV === "development") {
 
 /* -------------------- ROUTES -------------------- */
 app.use("/api/auth", authRoutes);
+app.use("/api", userItemsRoutes);
 
 /* -------------------- HEALTH CHECK -------------------- */
 app.get("/health", (req, res) => {

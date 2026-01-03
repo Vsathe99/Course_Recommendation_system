@@ -38,11 +38,14 @@ export const logInteraction = async ({
 }) => {
   return api.post(
     `${import.meta.env.VITE_RAG_API_URL}/interactions`,
+    null,
     {
-      user_id: userId,
-      item_id: itemId,
-      event,
-      dwell_time_ms: dwellTime,
+       params: {
+        user_id: userId,
+        item_id: itemId,
+        event,
+        dwell_time_ms: dwellTime,
+      },
     }
   );
 };

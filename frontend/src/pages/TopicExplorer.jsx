@@ -94,31 +94,46 @@ const TopicExplorer = () => {
   };
 
   const toggleLiked = async (id) => {
-    setResults((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, liked: !item.liked } : item
-      )
-    );
+  let nextLiked;
 
-    await logInteraction({
+  setResults((prev) =>
+    prev.map((item) => {
+      if (item.id === id) {
+        nextLiked = !item.liked;
+        return { ...item, liked: nextLiked };
+      }
+      return item;
+    })
+  );
+
+  await logInteraction({
     userId,
     itemId: id,
-    event: "like",
+    event: nextLiked ? "like" : "unlike",
   });
-  };
+};
 
-  const toggleSaved = async (id) => {
-    setResults((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, saved: !item.saved } : item
-      )
-    );
-    await logInteraction({
+
+ const toggleSaved = async (id) => {
+  let nextSaved;
+
+  setResults((prev) =>
+    prev.map((item) => {
+      if (item.id === id) {
+        nextSaved = !item.saved;
+        return { ...item, saved: nextSaved };
+      }
+      return item;
+    })
+  );
+
+  await logInteraction({
     userId,
     itemId: id,
-    event: "save",
+    event: nextSaved ? "save" : "unsave",
   });
-  };
+};
+
 
   const setUserRating = async (id, rating) => {
     setResults((prev) =>
