@@ -169,29 +169,4 @@ def add_interaction(
     return {"ok": True}
 
 
-@router.post("/train_cf")
-def train_cf(topic: str):
-    """
-    Manually train/retrain CF model for a given topic.
-    """
-    try:
-        faiss_store = FaissStore.from_topic(topic)
-    except FileNotFoundError:
-        return {
-            "ok": False,
-            "topic": topic,
-            "detail": (
-                f"No FAISS index found for topic '{topic}'. "
-                "Trigger /recommendations at least once (which will auto-run "
-                "ingest + index) or run /ingest + /build_index manually."
-            ),
-        }
 
-    cf = CFModel(topic, faiss_store)
-    cf.fit()
-
-    return {
-        "ok": True,
-        "topic": topic,
-        "detail": "CF model trained successfully for this topic.",
-    }
