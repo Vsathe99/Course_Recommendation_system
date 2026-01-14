@@ -1,8 +1,26 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Heart, Bookmark, Star, Send, Search, Sparkles } from "lucide-react";
 import AnimatedList from "@/components/AnimatedList/AnimatedList";
 import { getRecommendations, logInteraction } from "@/api/user";
 import { useSelector } from "react-redux";
+
+
+
+const UI_STATE_KEY = "topicExplorerItemState";
+
+const getItemState = () => {
+  try {
+    return JSON.parse(localStorage.getItem(UI_STATE_KEY)) || {};
+  } catch {
+    return {};
+  }
+};
+
+const setItemState = (itemId, patch) => {
+  const state = getItemState();
+  state[itemId] = { ...(state[itemId] || {}), ...patch };
+  localStorage.setItem(UI_STATE_KEY, JSON.stringify(state));
+};
 
 
 const TopicExplorer = () => {
@@ -19,8 +37,16 @@ const TopicExplorer = () => {
 
   const handleSubmit = async () => {
   if (!topic || !userId) return;
-
+  
+  const searchKey = JSON.stringify({
+  topic: topic.trim().toLowerCase(),
+  subtopic: subtopic.trim().toLowerCase(),
+  extraInfo: extraInfo.trim().toLowerCase(),
+  });
+   
+  setResults([]);
   setIsLoading(true);
+
   
 
   try {
@@ -47,51 +73,20 @@ const TopicExplorer = () => {
     }));
 
     setResults(formatted);
+    localStorage.setItem("topicExplorerResults", JSON.stringify(formatted));
+    localStorage.setItem("topicExplorerSearchKey", searchKey);
+    localStorage.setItem(
+      "topicExplorerQuery",
+      JSON.stringify({ topic, subtopic, extraInfo })
+    );
+
   } catch (err) {
     console.error("RAG error:", err);
-    const mockResults = generateMockResults();
-    setResults(mockResults);
   } finally {
     setIsLoading(false);
   }
 };
 
-
-  const generateMockResults = () => {
-    const sources = [
-      "Wikipedia",
-      "Research Gate",
-      "Academic Journal",
-      "Expert Blog",
-      "Industry Report",
-    ];
-    const baseDescriptions = [
-      "A comprehensive overview exploring the fundamental concepts and practical applications within this domain.",
-      "In-depth analysis revealing key insights and emerging trends that are shaping the future of this field.",
-      "Expert perspectives combined with real-world case studies demonstrating effective implementation strategies.",
-      "Critical examination of current methodologies with recommendations for best practices and optimization.",
-      "Detailed exploration of interconnected concepts, providing a holistic understanding of the subject matter.",
-    ];
-
-    return Array.from({ length: 5 }, (_, i) => ({
-      id: `result-${Date.now()}-${i}`,
-      name: `${topic || "General Topic"}${
-        subtopic ? `: ${subtopic}` : ""
-      } - Insight ${i + 1}`,
-      source: sources[i],
-      rating: parseFloat((3.5 + Math.random() * 1.5).toFixed(1)),
-      description: `${baseDescriptions[i]}${
-        extraInfo
-          ? ` Specifically addressing: "${extraInfo.slice(0, 100)}${
-              extraInfo.length > 100 ? "..." : ""
-            }"`
-          : ""
-      }`,
-      liked: false,
-      saved: false,
-      userRating: null,
-    }));
-  };
 
   const toggleLiked = async (id) => {
   let nextLiked;
@@ -105,6 +100,8 @@ const TopicExplorer = () => {
       return item;
     })
   );
+
+  setItemState(id, { liked: nextLiked });
 
   await logInteraction({
     userId,
@@ -127,6 +124,8 @@ const TopicExplorer = () => {
     })
   );
 
+  setItemState(id, { saved: nextSaved });
+
   await logInteraction({
     userId,
     itemId: id,
@@ -141,12 +140,59 @@ const TopicExplorer = () => {
         item.id === id ? { ...item, userRating: rating } : item
       )
     );
+
+    setItemState(id, { userRating: rating });
+
     await logInteraction({
     userId,
     itemId: id,
     event: `rate:${rating}`,
   });
   };
+
+  useEffect(() => {
+    const savedResults = localStorage.getItem("topicExplorerResults");
+    const savedQuery = localStorage.getItem("topicExplorerQuery");
+    const savedKey = localStorage.getItem("topicExplorerSearchKey");
+
+    if (!savedResults || !savedQuery || !savedKey) return;
+
+    const { topic, subtopic, extraInfo } = JSON.parse(savedQuery);
+
+    // restore inputs FIRST
+    setTopic(topic);
+    setSubtopic(subtopic);
+    setExtraInfo(extraInfo);
+
+    const currentKey = JSON.stringify({
+      topic: topic.trim().toLowerCase(),
+      subtopic: subtopic.trim().toLowerCase(),
+      extraInfo: extraInfo.trim().toLowerCase(),
+    });
+
+    if (savedKey === currentKey) {
+      const itemState = getItemState();
+
+      const restoredResults = JSON.parse(savedResults).map((item) => ({
+        ...item,
+        liked: itemState[item.id]?.liked ?? item.liked ?? false,
+        saved: itemState[item.id]?.saved ?? item.saved ?? false,
+        userRating: itemState[item.id]?.userRating ?? item.userRating ?? null,
+      }));
+
+      setResults(restoredResults);
+
+    }
+    
+    return () => {
+    // runs when component unmounts (route change)
+    localStorage.removeItem("topicExplorerResults");
+    localStorage.removeItem("topicExplorerSearchKey");
+    localStorage.removeItem("topicExplorerQuery");
+    localStorage.removeItem("topicExplorerItemState");
+  };
+  }, []);
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
@@ -285,104 +331,7 @@ const TopicExplorer = () => {
   );
 };
 
-const ResultCard = ({ item, onToggleLiked, onToggleSaved, onSetRating }) => {
-  const [ratingOpen, setRatingOpen] = useState(false);
 
-  return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
-      <div className="flex flex-col lg:flex-row gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
-            <h4 className="text-lg font-semibold text-slate-900 leading-tight">
-              {item.name}
-            </h4>
-            <span className="text-xs font-medium text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full whitespace-nowrap">
-              {item.source}
-            </span>
-          </div>
 
-          <p className="text-slate-600 text-sm leading-relaxed mb-3">
-            {item.description}
-          </p>
-
-          <div className="flex items-center gap-1.5">
-            <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-            <span className="text-sm font-medium text-slate-900">
-              {item.rating}
-            </span>
-            <span className="text-xs text-slate-500">/ 5</span>
-          </div>
-        </div>
-
-        <div className="flex lg:flex-col items-center lg:items-end gap-2 lg:gap-3 pt-2 lg:pt-0 border-t lg:border-t-0 lg:border-l border-slate-200 lg:pl-4">
-          <button
-            onClick={() => onToggleSaved(item.id)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${
-              item.saved
-                ? "bg-green-50 text-green-700 border-green-200"
-                : "bg-white text-slate-600 border-slate-200 hover:border-green-300 hover:text-green-700"
-            }`}
-          >
-            <Bookmark
-              className={`w-4 h-4 ${item.saved ? "fill-green-700" : ""}`}
-            />
-            <span>{item.saved ? "Saved" : "Save"}</span>
-          </button>
-
-          <button
-            onClick={() => onToggleLiked(item.id)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${
-              item.liked
-                ? "bg-rose-50 text-rose-700 border-rose-200"
-                : "bg-white text-slate-600 border-slate-200 hover:border-rose-300 hover:text-rose-700"
-            }`}
-          >
-            <Heart className={`w-4 h-4 ${item.liked ? "fill-rose-700" : ""}`} />
-            <span>{item.liked ? "Liked" : "Like"}</span>
-          </button>
-
-          <div className="relative">
-            <button
-              onClick={() => setRatingOpen(!ratingOpen)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${
-                item.userRating
-                  ? "bg-amber-50 text-amber-700 border-amber-200"
-                  : "bg-white text-slate-600 border-slate-200 hover:border-amber-300 hover:text-amber-700"
-              }`}
-            >
-              <Star
-                className={`w-4 h-4 ${item.userRating ? "fill-amber-700" : ""}`}
-              />
-              <span>{item.userRating ? `${item.userRating}/5` : "Rate"}</span>
-            </button>
-
-            {ratingOpen && (
-              <div className="absolute bottom-full right-0 mb-2 bg-white border border-slate-200 rounded-xl shadow-lg p-2 z-10">
-                <div className="flex gap-1">
-                  {[1, 2, 3, 4, 5].map((rating) => (
-                    <button
-                      key={rating}
-                      onClick={() => {
-                        onSetRating(item.id, rating);
-                        setRatingOpen(false);
-                      }}
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
-                        item.userRating === rating
-                          ? "bg-amber-500 text-white"
-                          : "hover:bg-slate-100 text-slate-600 hover:text-slate-900"
-                      }`}
-                    >
-                      {rating}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 export default TopicExplorer;

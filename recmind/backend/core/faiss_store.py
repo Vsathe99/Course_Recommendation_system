@@ -5,6 +5,13 @@ import numpy as np
 from pathlib import Path
 from backend.core.paths import FAISS_DIR
 
+def _normalize_topic(topic: str) -> str:
+    return (
+        topic.strip()
+        .lower()
+        .replace(" ", "_")
+        .replace("/", "_")
+    )
 
 class FaissStore:
     def __init__(self, dim: int, path: Path):
@@ -19,6 +26,7 @@ class FaissStore:
         Read-only / recommend-time usage:
         loads existing FAISS index from FAISS_DIR/{topic}.index
         """
+        
         path = FAISS_DIR / f"{topic}.index"
 
         if not path.exists():

@@ -15,7 +15,6 @@ from backend.core.embedding import embed_texts
 from backend.core.faiss_store import FaissStore
 from backend.core.paths import MODEL_DIR
 
-# ensure directory exists
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -30,6 +29,8 @@ class CFModel:
 
         self.model: Optional[LightFM] = None
         self.pca: Optional[PCA] = None
+        self.item_features: Optional[sparse.csr_matrix] = None
+
         self.user_index: Dict[str, int] = {}
         self.item_index: Dict[str, int] = {}
         self.rev_item_index: List[str] = []
@@ -56,6 +57,18 @@ class CFModel:
     # Data preparation
     # -------------------------
 
+    def _interaction_weight(self, r: dict) -> float:
+        weight = 0.0
+        if r.get("liked") is True:
+            weight += 2.0
+        if r.get("saved") is True:
+            weight += 2.5
+        if "rating" in r and isinstance(r["rating"], (int, float)):
+            weight += float(r["rating"])
+        if weight == 0.0:
+            weight = 1.0
+        return weight
+
     def _load_interactions(self):
         inters = db.get_interactions_by_topic(self.topic)
         items = db.get_items_by_topic(self.topic)
@@ -68,19 +81,13 @@ class CFModel:
 
         rows, cols, vals = [], [], []
 
-        wmap = {
-            "impression": 0.1,
-            "click": 1,
-            "like": 2,
-            "complete": 3,
-        }
-
         for r in inters:
             iid = str(r["item_id"])
-            if iid in iidx:
-                rows.append(uidx[r["user_id"]])
+            uid = r["user_id"]
+            if iid in iidx and uid in uidx:
+                rows.append(uidx[uid])
                 cols.append(iidx[iid])
-                vals.append(wmap.get(r["event"], 1))
+                vals.append(self._interaction_weight(r))
 
         X = sparse.coo_matrix(
             (vals, (rows, cols)),
@@ -91,11 +98,7 @@ class CFModel:
 
     def _build_item_features(self, item_ids: List[str]) -> sparse.csr_matrix:
         items = db.get_items_by_ids(item_ids)
-
-        texts = [
-            f"{it.get('title', '')} {it.get('desc', '')}"
-            for it in items
-        ]
+        texts = [f"{it.get('title', '')} {it.get('desc', '')}" for it in items]
 
         vecs = embed_texts(texts)
 
@@ -116,7 +119,7 @@ class CFModel:
         self.item_index = iidx
         self.rev_item_index = item_ids
 
-        item_features = self._build_item_features(item_ids)
+        self.item_features = self._build_item_features(item_ids)
 
         self.model = LightFM(
             loss="warp",
@@ -126,7 +129,7 @@ class CFModel:
 
         self.model.fit(
             X.tocsr(),
-            item_features=item_features,
+            item_features=self.item_features,
             epochs=15,
             num_threads=4,
         )
@@ -141,6 +144,7 @@ class CFModel:
             "item_index": self.item_index,
             "rev_item_index": self.rev_item_index,
             "pca": self.pca,
+            "item_features": self.item_features,
         }
 
         with self._model_path().open("wb") as f:
@@ -160,6 +164,7 @@ class CFModel:
         self.item_index = p["item_index"]
         self.rev_item_index = p["rev_item_index"]
         self.pca = p["pca"]
+        self.item_features = p["item_features"]
 
         return True
 
@@ -176,33 +181,26 @@ class CFModel:
         if self.model is None and not self.load():
             return None
 
-        items = db.get_items_by_ids(self.rev_item_index)
-        texts = [
-            f"{it.get('title', '')} {it.get('desc', '')}"
-            for it in items
-        ]
+        if user_id not in self.user_index:
+            return None  # cold-start user → fallback to RAG
 
-        vecs = embed_texts(texts)
-        item_features = sparse.csr_matrix(self.pca.transform(vecs))
+        uidx = self.user_index[user_id]
 
-        uidx = self.user_index.get(user_id, len(self.user_index))
-
-        idxs = [
-            self.item_index[cid]
+        valid_pairs = [
+            (cid, self.item_index[cid])
             for cid in candidate_ids
             if cid in self.item_index
         ]
 
-        if not idxs:
+        if not valid_pairs:
             return None
+
+        cids, idxs = zip(*valid_pairs)
 
         scores = self.model.predict(
             uidx,
             np.array(idxs, dtype=np.int32),
-            item_features=item_features,
+            item_features=self.item_features,
         )
 
-        return {
-            cid: float(scores[i]) if cid in self.item_index else 0.0
-            for i, cid in enumerate(candidate_ids)
-        }
+        return {cid: float(score) for cid, score in zip(cids, scores)}
