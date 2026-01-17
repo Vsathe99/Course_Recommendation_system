@@ -1,7 +1,7 @@
 import Interaction from "../models/interaction.js";
 
 export const getLikedItems = async (req, res) => {
-  const { userId } = req.params;
+  const userId  = req.user.id;
 
   try {
     const items = await Interaction.aggregate([

@@ -5,6 +5,22 @@ export const fetchMe = async () => {
   return data;
 };
 
+export const fetchLikedItems = async () => {
+  const { data } = await api.get("/user/liked");
+  return data;
+};
+
+export const fetchSavedItems = async () => {
+  const { data } = await api.get("/user/saved");
+  return data;
+};
+
+export const getLlmSuggestions = async (items) => {
+  const { data } = await api.post("/llm/suggestions", {
+    items,
+  });
+  return data;
+};
 /* ================= RAG / FASTAPI ================= */
 
 export const getRecommendations = async ({

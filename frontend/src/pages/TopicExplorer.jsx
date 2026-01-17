@@ -3,8 +3,9 @@ import { Heart, Bookmark, Star, Send, Search, Sparkles } from "lucide-react";
 import AnimatedList from "@/components/AnimatedList/AnimatedList";
 import { getRecommendations, logInteraction } from "@/api/user";
 import { useSelector } from "react-redux";
-
-
+import UserAvatar from "@/components/UserAvatar";
+import ContentModal from "@/components/ContentModal";
+import LlmSuggestionModal from "@/components/LlmSuggestionModal";
 
 const UI_STATE_KEY = "topicExplorerItemState";
 
@@ -22,7 +23,6 @@ const setItemState = (itemId, patch) => {
   localStorage.setItem(UI_STATE_KEY, JSON.stringify(state));
 };
 
-
 const TopicExplorer = () => {
   const [topic, setTopic] = useState("");
   const [subtopic, setSubtopic] = useState("");
@@ -31,123 +31,123 @@ const TopicExplorer = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [hideInputBar, setHideInputBar] = useState(false);
   const lastScrollTop = useRef(0);
+  const [modalType, setModalType] = useState(null);
   const userId = useSelector((state) => state.user?.user?._id);
+  const [llmOpen, setLlmOpen] = useState(false);
+  const [exploreUsed, setExploreUsed] = useState(
+    !!localStorage.getItem("topicExplorerResults"),
+  );
+
   console.log("userId:", userId);
 
-
   const handleSubmit = async () => {
-  if (!topic || !userId) return;
-  
-  const searchKey = JSON.stringify({
-  topic: topic.trim().toLowerCase(),
-  subtopic: subtopic.trim().toLowerCase(),
-  extraInfo: extraInfo.trim().toLowerCase(),
-  });
-   
-  setResults([]);
-  setIsLoading(true);
+    if (!topic || !userId) return;
 
-  
-
-  try {
-    const query = [subtopic, extraInfo].filter(Boolean).join(" ");
-
-    const data = await getRecommendations({
-      userId,
-      topic,
-      query,
+    const searchKey = JSON.stringify({
+      topic: topic.trim().toLowerCase(),
+      subtopic: subtopic.trim().toLowerCase(),
+      extraInfo: extraInfo.trim().toLowerCase(),
     });
 
-    const formatted = data.map((item) => ({
-      id: item.id, // ideally Mongo _id
-      name: item.title,
-      desc: item.desc,
-      url: item.url,
-      source: item.source,
-      score: item.score,
-      used_cf: item.used_cf,
-      liked: false,
-      saved: false,
-      userRating: null,
-      _enterTs: Date.now(),
-    }));
+    setResults([]);
+    setIsLoading(true);
 
-    setResults(formatted);
-    localStorage.setItem("topicExplorerResults", JSON.stringify(formatted));
-    localStorage.setItem("topicExplorerSearchKey", searchKey);
-    localStorage.setItem(
-      "topicExplorerQuery",
-      JSON.stringify({ topic, subtopic, extraInfo })
-    );
+    try {
+      const query = [subtopic, extraInfo].filter(Boolean).join(" ");
 
-  } catch (err) {
-    console.error("RAG error:", err);
-  } finally {
-    setIsLoading(false);
-  }
-};
+      const data = await getRecommendations({
+        userId,
+        topic,
+        query,
+      });
 
+      const formatted = data.map((item) => ({
+        id: item.id, // ideally Mongo _id
+        name: item.title,
+        desc: item.desc,
+        url: item.url,
+        source: item.source,
+        score: item.score,
+        used_cf: item.used_cf,
+        liked: false,
+        saved: false,
+        userRating: null,
+        _enterTs: Date.now(),
+      }));
+
+      setResults(formatted);
+      setExploreUsed(true);
+      localStorage.setItem("topicExplorerResults", JSON.stringify(formatted));
+      localStorage.setItem("topicExplorerSearchKey", searchKey);
+      localStorage.setItem(
+        "topicExplorerQuery",
+        JSON.stringify({ topic, subtopic, extraInfo }),
+      );
+    } catch (err) {
+      console.error("RAG error:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const toggleLiked = async (id) => {
-  let nextLiked;
+    let nextLiked;
 
-  setResults((prev) =>
-    prev.map((item) => {
-      if (item.id === id) {
-        nextLiked = !item.liked;
-        return { ...item, liked: nextLiked };
-      }
-      return item;
-    })
-  );
+    setResults((prev) =>
+      prev.map((item) => {
+        if (item.id === id) {
+          nextLiked = !item.liked;
+          return { ...item, liked: nextLiked };
+        }
+        return item;
+      }),
+    );
 
-  setItemState(id, { liked: nextLiked });
+    setItemState(id, { liked: nextLiked });
 
-  await logInteraction({
-    userId,
-    itemId: id,
-    event: nextLiked ? "like" : "unlike",
-  });
-};
+    await logInteraction({
+      userId,
+      itemId: id,
+      event: nextLiked ? "like" : "unlike",
+    });
+  };
 
+  const toggleSaved = async (id) => {
+    let nextSaved;
 
- const toggleSaved = async (id) => {
-  let nextSaved;
+    setResults((prev) =>
+      prev.map((item) => {
+        if (item.id === id) {
+          nextSaved = !item.saved;
+          return { ...item, saved: nextSaved };
+        }
+        return item;
+      }),
+    );
 
-  setResults((prev) =>
-    prev.map((item) => {
-      if (item.id === id) {
-        nextSaved = !item.saved;
-        return { ...item, saved: nextSaved };
-      }
-      return item;
-    })
-  );
+    setItemState(id, { saved: nextSaved });
 
-  setItemState(id, { saved: nextSaved });
-
-  await logInteraction({
-    userId,
-    itemId: id,
-    event: nextSaved ? "save" : "unsave",
-  });
-};
-
+    await logInteraction({
+      userId,
+      itemId: id,
+      event: nextSaved ? "save" : "unsave",
+    });
+  };
 
   const setUserRating = async (id, rating) => {
     setResults((prev) =>
       prev.map((item) =>
-        item.id === id ? { ...item, userRating: rating } : item
-      )
+        item.id === id ? { ...item, userRating: rating } : item,
+      ),
     );
 
     setItemState(id, { userRating: rating });
 
     await logInteraction({
-    userId,
-    itemId: id,
-    event: `rate:${rating}`,
-  });
+      userId,
+      itemId: id,
+      event: `rate:${rating}`,
+    });
   };
 
   useEffect(() => {
@@ -181,18 +181,16 @@ const TopicExplorer = () => {
       }));
 
       setResults(restoredResults);
-
     }
-    
-    return () => {
-    // runs when component unmounts (route change)
-    localStorage.removeItem("topicExplorerResults");
-    localStorage.removeItem("topicExplorerSearchKey");
-    localStorage.removeItem("topicExplorerQuery");
-    localStorage.removeItem("topicExplorerItemState");
-  };
-  }, []);
 
+    return () => {
+      // runs when component unmounts (route change)
+      localStorage.removeItem("topicExplorerResults");
+      localStorage.removeItem("topicExplorerSearchKey");
+      localStorage.removeItem("topicExplorerQuery");
+      localStorage.removeItem("topicExplorerItemState");
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
@@ -207,16 +205,16 @@ const TopicExplorer = () => {
                 SmartLearn AI
               </span>
             </div>
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-600 to-slate-900 flex items-center justify-center text-white font-medium text-sm shadow-md">
-              JD
-            </div>
+            {/* RIGHT USER AVATAR */}
+            <UserAvatar onOpenModal={setModalType} />
           </div>
         </div>
       </nav>
 
-      <main 
+      {/* MAIN CONTENT AREA */}
+      <main
         className="flex-1 pb-64 overflow-auto"
-         onScrollCapture={(e) => {
+        onScrollCapture={(e) => {
           const target = e.target;
 
           // only react to scroll-list scrolling
@@ -281,6 +279,7 @@ const TopicExplorer = () => {
         </div>
       </main>
 
+      {/* INPUT BAR */}
       <div
         className={`fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg transition-transform duration-300 ${
           hideInputBar ? "translate-y-full" : "translate-y-0"
@@ -306,13 +305,6 @@ const TopicExplorer = () => {
                     className="flex-1 px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
                   />
                 </div>
-                <textarea
-                  placeholder="Additional context or specific questions (optional)"
-                  value={extraInfo}
-                  onChange={(e) => setExtraInfo(e.target.value)}
-                  rows={2}
-                  className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-green-500 resize-none transition-all"
-                />
               </div>
 
               <button
@@ -323,15 +315,38 @@ const TopicExplorer = () => {
                 <Send className="w-4 h-4" />
                 <span className="hidden sm:inline">Explore</span>
               </button>
+
+              <button
+                onClick={() => setLlmOpen(true)}
+                disabled={!exploreUsed}
+                className="px-6 py-3 bg-slate-900 text-white font-medium rounded-xl hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                🤖 LLM Suggestion
+              </button>
             </div>
           </div>
         </div>
       </div>
+
+
+        {/* saved and liked MODALS */}
+      {modalType && (
+        <ContentModal
+          type={modalType}
+          onClose={() => setModalType(null)}
+          onToggleLiked={toggleLiked}
+          onToggleSaved={toggleSaved}
+          onSetRating={setUserRating}
+        />
+      )}
+
+      {/* LLM SUGGESTION MODAL */}
+      {llmOpen && <LlmSuggestionModal onClose={() => setLlmOpen(false)} />}
     </div>
+
+    
+
   );
 };
-
-
-
 
 export default TopicExplorer;
