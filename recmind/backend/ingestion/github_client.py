@@ -21,7 +21,7 @@ if GITHUB_TOKEN:
 def _retry_request(
     url: str,
     params: dict = None,
-    max_retries: int = 2
+    max_retries: int = 1
 ) -> Optional[requests.Response]:
     backoff = 1
     for _ in range(max_retries):

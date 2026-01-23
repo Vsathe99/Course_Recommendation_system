@@ -121,14 +121,60 @@ def log_interaction(
     event: str,
     dwell_time_ms: Optional[int] = None,
 ):
-    doc = {
+    col = _interactions_col()
+    oid = ObjectId(item_id)
+
+    # LIKE / UNLIKE
+    if event in ("like", "unlike"):
+        col.update_one(
+            {"user_id": user_id, "item_id": oid},
+            {
+                "$set": {
+                    "liked": event == "like",
+                    "updated_at": datetime.utcnow(),
+                }
+            },
+            upsert=True,
+        )
+        return
+
+    # SAVE / UNSAVE
+    if event in ("save", "unsave"):
+        col.update_one(
+            {"user_id": user_id, "item_id": oid},
+            {
+                "$set": {
+                    "saved": event == "save",
+                    "updated_at": datetime.utcnow(),
+                }
+            },
+            upsert=True,
+        )
+        return
+
+    # RATING
+    if event.startswith("rate:"):
+        rating = int(event.split(":")[1])
+        col.update_one(
+            {"user_id": user_id, "item_id": oid},
+            {
+                "$set": {
+                    "rating": rating,
+                    "updated_at": datetime.utcnow(),
+                }
+            },
+            upsert=True,
+        )
+        return
+
+    # FALLBACK: event log (views, dwell, etc.)
+    col.insert_one({
         "user_id": user_id,
-        "item_id": ObjectId(item_id),
+        "item_id": oid,
         "event": event,
         "ts": datetime.utcnow(),
         "dwell_time_ms": dwell_time_ms,
-    }
-    _interactions_col().insert_one(doc)
+    })
 
 
 def get_interactions_by_topic(topic: str):

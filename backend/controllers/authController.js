@@ -232,8 +232,8 @@ export const googleCallback = async (req, res) => {
 
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
-      secure: isProd,
-      sameSite: "strict",
+      secure: true,
+      sameSite: "none",
     });
 
     res.redirect(

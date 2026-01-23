@@ -80,6 +80,9 @@ def _run_full_rag_pipeline_for_topic(topic: str) -> None:
             continue
 
 
+from pathlib import Path
+from backend.core.paths import FAISS_DIR
+
 @router.get("/recommendations")
 def recommendations(
     user_id: str,
@@ -88,27 +91,35 @@ def recommendations(
     k: int = 10,
     alpha: float = 0.5,
 ):
-    """
-    If FAISS index for this topic exists:
-        → load it and serve recommendations.
+    print("\n================ FAISS DEBUG =================")
+    print("RAW topic:", topic)
+    print("repr(topic):", repr(topic))
+    print("FAISS_DIR:", FAISS_DIR)
 
-    If FAISS index does NOT exist:
-        → automatically run:
-            1) Ingest (GitHub + YouTube)
-            2) Build index (both sources)
-            3) Load FAISS and serve recommendations.
-    """
+    expected_path = FAISS_DIR / f"{topic}.index"
+    print("Expected FAISS path (raw):", expected_path)
+    print("Exists (raw):", expected_path.exists())
+
+    print("Files in FAISS_DIR:")
+    for f in FAISS_DIR.iterdir():
+        print("  -", repr(f.name))
+    print("=============================================\n")
 
     # --- try to load existing FAISS index for this topic ---
     try:
         faiss_store = FaissStore.from_topic(topic)
-    except FileNotFoundError:
-        # No index yet → run full RAG pipeline and then try again
+        print("✅ FAISS LOADED")
+        print("FAISS index path:", faiss_store.path)
+        print("Index dim:", faiss_store.index.d)
+        print("Total vectors:", faiss_store.index.ntotal)
+    except FileNotFoundError as e:
+        print("❌ FAISS NOT FOUND:", e)
+        print("➡️ Running ingestion + build_index...")
         _run_full_rag_pipeline_for_topic(topic)
 
-        # Try loading again; if it still fails, raise an error
         try:
             faiss_store = FaissStore.from_topic(topic)
+            print("✅ FAISS LOADED AFTER BUILD")
         except FileNotFoundError:
             raise HTTPException(
                 status_code=500,
@@ -121,9 +132,9 @@ def recommendations(
     # ---- Now we definitely have a FAISS store ----
     zs = ZeroShotRanker(faiss_store)
     cf = CFModel(topic, faiss_store)
-    print("zs:", zs)
 
-    use_cf = cf.is_trained()
+    print("CF model path:", cf._model_path())
+    print("CF trained:", cf.is_trained())
 
     ranked = rank_hybrid(
         user_id=user_id,
@@ -133,27 +144,30 @@ def recommendations(
         query=q,
         k=k,
         alpha=alpha,
-        use_cf=use_cf,
+        use_cf=cf.is_trained(),
     )
 
     print("DEBUG ranked:", ranked)
 
-    item_ids = [iid for iid, _ in ranked]  # these are Mongo _id strings
+    item_ids = [iid for iid, _ in ranked]
     items = db.get_items_by_ids(item_ids)
 
     id_map = {str(it["_id"]): it for it in items}
 
     return [
         {
+            "id": str(id_map[i]["_id"]),
             "title": id_map[i]["title"],
             "url": id_map[i]["url"],
             "source": id_map[i]["source"],
+            "desc": id_map[i].get("desc", ""),
             "score": s,
-            "used_cf": use_cf,
+            "used_cf": cf.is_trained(),
         }
         for i, s in ranked
         if i in id_map
     ]
+
 
 
 @router.post("/interactions")
@@ -167,29 +181,4 @@ def add_interaction(
     return {"ok": True}
 
 
-@router.post("/train_cf")
-def train_cf(topic: str):
-    """
-    Manually train/retrain CF model for a given topic.
-    """
-    try:
-        faiss_store = FaissStore.from_topic(topic)
-    except FileNotFoundError:
-        return {
-            "ok": False,
-            "topic": topic,
-            "detail": (
-                f"No FAISS index found for topic '{topic}'. "
-                "Trigger /recommendations at least once (which will auto-run "
-                "ingest + index) or run /ingest + /build_index manually."
-            ),
-        }
 
-    cf = CFModel(topic, faiss_store)
-    cf.fit()
-
-    return {
-        "ok": True,
-        "topic": topic,
-        "detail": "CF model trained successfully for this topic.",
-    }

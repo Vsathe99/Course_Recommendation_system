@@ -111,6 +111,14 @@ pytest_cache/
 # Local uploads or media
 uploads/
 media/
+data/
+*.index
+*.parquet
+*.pkl
+
+# Docker
+Dockerfile*
+docker-compose*.yml
 
 # -----------------------------
 # End of .gitignore

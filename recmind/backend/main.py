@@ -8,9 +8,22 @@ from backend.recommender.builder import build_index
 import asyncio
 import concurrent.futures
 from backend.recommender.routes import router as rec_router
+from fastapi.middleware.cors import CORSMiddleware
+
 
 settings = get_settings()
 app = FastAPI(title="recmind-ingestion")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",   # Vite frontend
+        "http://localhost:3000",   # React (if used)
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],   # 🔑 THIS enables OPTIONS
+    allow_headers=["*"],
+)
 
 
 @app.get("/ping")

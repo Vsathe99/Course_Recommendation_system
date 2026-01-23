@@ -10,6 +10,8 @@ import compression from "compression";
 
 import connectDB from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
+import userItemsRoutes from "./routes/userItems.js";
+import llmRoutes from "./routes/llmRoutes.js";
 
 /* -------------------- ENV VALIDATION -------------------- */
 const PORT = process.env.PORT || 5000;
@@ -32,7 +34,7 @@ app.use(express.urlencoded({ extended: true }));
 /* -------------------- CORS -------------------- */
 app.use(
   cors({
-    origin: process.env.CLIENT_URL,
+    origin: process.env.FRONTEND_URL,
     credentials: true,
   })
 );
@@ -49,6 +51,8 @@ if (NODE_ENV === "development") {
 
 /* -------------------- ROUTES -------------------- */
 app.use("/api/auth", authRoutes);
+app.use("/api", userItemsRoutes);
+app.use("/api/llm", llmRoutes);
 
 /* -------------------- HEALTH CHECK -------------------- */
 app.get("/health", (req, res) => {
