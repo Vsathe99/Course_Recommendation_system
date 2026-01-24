@@ -111,7 +111,6 @@ pytest_cache/
 # Local uploads or media
 uploads/
 media/
-data/
 *.index
 *.parquet
 *.pkl
