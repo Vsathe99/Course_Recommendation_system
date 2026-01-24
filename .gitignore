@@ -116,9 +116,6 @@ data/
 *.parquet
 *.pkl
 
-# Docker
-Dockerfile*
-docker-compose*.yml
 
 # -----------------------------
 # End of .gitignore

@@ -1,0 +1,13 @@
+version: "3.9"
+
+services:
+  backend:
+    container_name: node-backend
+    build: .
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    expose:
+      - "5000"
+    restart: unless-stopped
