@@ -137,7 +137,7 @@ const SignupPage = () => {
             <Sparkles className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Join TopicLens
+            Join SmartLearn AI
           </h1>
           <p className="text-gray-600">
             Create your account to get started
