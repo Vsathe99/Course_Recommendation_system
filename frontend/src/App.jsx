@@ -1,27 +1,27 @@
-// App.jsx
+// src/App.jsx
 import React, { useEffect } from "react";
-import {
-  BrowserRouter,
-  Routes,
-  Route
-} from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 
-import Home from "./pages/Home";
-import TopicExplorer from "./pages/TopicExplorer";
-import Signup from "./pages/Signup";
-import Login from "./pages/Login";
-import OAuthSuccess from "./pages/OAuthSuccess";
-import VerifyEmail from "./pages/VerifyEmail";
+/* ================== PAGES ================== */
+import Home from "./pages/Home.jsx";
+import TopicExplorer from "./pages/TopicExplorer.jsx";
+import Signup from "./pages/Signup.jsx";
+import Login from "./pages/Login.jsx";
+import OAuthSuccess from "./pages/OAuthSuccess.jsx";
+import VerifyEmail from "./pages/VerifyEmail.jsx";
 
-import ProtectedRoute from "./components/ProtectedRoutes/ProtectedRoute";
+/* ================== COMPONENTS ================== */
+import ProtectedRoute from "./components/ProtectedRoutes/ProtectedRoute.jsx";
+
+/* ================== API / STORE ================== */
 import { fetchMe } from "./api/user";
 import { setUser } from "./store/userSlice";
 
 /* ================== BOOTSTRAP ================== */
 function AppBootstrap({ children }) {
   const dispatch = useDispatch();
-  const token = useSelector((state) => state.auth.accessToken);
+  const token = useSelector((state) => state.auth?.accessToken);
 
   useEffect(() => {
     if (token) {
@@ -36,15 +36,13 @@ function AppBootstrap({ children }) {
 
 /* ================== APP ================== */
 function App() {
-
-
   return (
     <AppBootstrap>
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<Home />} />
         <Route path="/signup" element={<Signup />} />
-        <Route path="/verify-email" element={<VerifyEmail/>}/>
+        <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/login" element={<Login />} />
         <Route path="/oauth-success" element={<OAuthSuccess />} />
 
