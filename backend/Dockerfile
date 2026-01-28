@@ -1,23 +1,17 @@
 FROM node:18-alpine
 
-# Create app user (security)
-RUN addgroup -S app && adduser -S app -G app
-
 WORKDIR /app
 
-# Copy only package files first (better caching)
+# Copy package files
 COPY package*.json ./
 
-# Install only production deps
-ENV NODE_ENV=production
-RUN npm install --omit=dev
+# ✅ Install ALL deps (including nodemon)
+RUN npm install
 
-# Copy source code
+# Copy source
 COPY . .
-
-# Use non-root user
-USER app
 
 EXPOSE 5000
 
-CMD ["npm", "run", "start"]
+# ✅ Run dev server
+CMD ["npm", "run", "dev"]
