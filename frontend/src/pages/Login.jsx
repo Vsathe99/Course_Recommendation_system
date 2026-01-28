@@ -7,6 +7,8 @@ import { setAccessToken } from "../store/authSlice";
 import { setUser } from "../store/userSlice";
 import { fetchMe } from "../api/user";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 const Login = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -39,7 +41,7 @@ const Login = () => {
   };
 
   const handleOAuth = (provider) => {
-    window.location.href = `http://localhost:5000/api/auth/${provider}`;
+    window.location.href = `${API_BASE_URL}/auth/${provider}`;
   };
 
   return (

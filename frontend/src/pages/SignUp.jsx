@@ -11,6 +11,8 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axios";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 const SignupPage = () => {
   const navigate = useNavigate();
 
@@ -116,16 +118,16 @@ const SignupPage = () => {
   };
 
   /* ================= OAUTH ================= */
-  const handleSocialSignup = (provider) => {
-    if (provider === "Google") {
-      window.location.href =
-        "http://localhost:5000/api/auth/google";
-    }
-    if (provider === "GitHub") {
-      window.location.href =
-        "http://localhost:5000/api/auth/github";
-    }
-  };
+
+const handleSocialSignup = (provider) => {
+  if (provider === "Google") {
+    window.location.href = `${API_BASE_URL}/auth/google`;
+  }
+
+  if (provider === "GitHub") {
+    window.location.href = `${API_BASE_URL}/auth/github`;
+  }
+};
 
   /* ================= UI ================= */
   return (
@@ -137,7 +139,7 @@ const SignupPage = () => {
             <Sparkles className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Join TopicLens
+            Join SmartLearn AI
           </h1>
           <p className="text-gray-600">
             Create your account to get started
