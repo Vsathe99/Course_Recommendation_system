@@ -16,9 +16,14 @@ export const fetchSavedItems = async () => {
 };
 
 export const getLlmSuggestions = async (items) => {
-  const { data } = await api.post("/llm/suggestions", {
-    items,
-  });
+  const { data } = await api.post(
+    "/llm/suggestions",
+    { items },
+    {
+      timeout: 120000, // ⬅️ 2 minutes (REQUIRED)
+    }
+  );
+
   return data;
 };
 /* ================= RAG / FASTAPI ================= */

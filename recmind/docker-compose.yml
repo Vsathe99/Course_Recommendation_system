@@ -2,22 +2,17 @@ version: "3.9"
 
 services:
   backend:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
+    image: vxllx/recmind-backend:latest
     container_name: recmind-backend
     env_file:
       - .env
     ports:
       - "8000:8000"
+
+    # ✅ Persist ONLY data
     volumes:
-      - ./backend:/app/backend     # ✅ mount code
-      - recmind_data:/data
-    command: >
-      uvicorn backend.main:app
-      --host 0.0.0.0
-      --port 8000
-      --reload
+      - recmind_data:/app/backend/data
+
     restart: unless-stopped
 
 volumes:

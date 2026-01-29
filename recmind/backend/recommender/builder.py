@@ -30,14 +30,23 @@ def build_index(topic: str, source: str, faiss_path: str) -> int:
         number of items indexed for this call.
         If 0, nothing was added (empty parquet or no usable rows).
     """
+
+    print("=== BUILD INDEX START ===")
+    print("Topic:", topic)
+    print("Source:", source)
+
     parquet_path = os.path.join(settings.RAW_DATA_DIR, source, f"{topic}.parquet")
+    print("Parquet path:", parquet_path)
+
     if not os.path.exists(parquet_path):
         raise FileNotFoundError(f"Missing parquet file: {parquet_path}")
 
     df = pd.read_parquet(parquet_path)
+    print("Parquet loaded. Rows:", len(df))
 
     # If no rows, nothing to index
     if df.empty:
+        print("Parquet is empty. Nothing to index.")
         return 0
 
     # ------------- Construct text fields safely -------------
@@ -52,19 +61,20 @@ def build_index(topic: str, source: str, faiss_path: str) -> int:
         transcripts = _safe_col(df, "transcript")
         texts = (titles + " " + descs + " " + transcripts).tolist()
 
-    # If somehow all texts list is empty, bail out
+    print("Texts constructed:", len(texts))
+
     if not texts:
+        print("No texts found. Exiting.")
         return 0
 
     # ------------- Generate embeddings -------------
-    vecs = embed_texts(texts)  # could be list or np array
+    vecs = embed_texts(texts)
     vecs = np.array(vecs)
 
-    # Possible shapes:
-    # - (n, dim)  -> OK
-    # - (dim,)    -> single vector, make it (1, dim)
-    # - (0,)      -> no vectors, bail out
+    print("Embeddings generated. Shape:", vecs.shape)
+
     if vecs.size == 0:
+        print("No embeddings generated. Exiting.")
         return 0
 
     if vecs.ndim == 1:
@@ -73,12 +83,15 @@ def build_index(topic: str, source: str, faiss_path: str) -> int:
         raise ValueError(f"Unexpected embedding shape: {vecs.shape}")
 
     n_docs, dim = vecs.shape
+    print("Docs:", n_docs, "Dim:", dim)
 
     # ------------- Store metadata + build numeric IDs -------------
     ids: list[int] = []
 
-    # IMPORTANT: df.iterrows() order matches `texts` / `vecs`
-    for _, row in df.iterrows():
+    print("Starting MongoDB inserts...")
+    print("Mongo URI:", settings.MONGO_URI)
+
+    for idx, (_, row) in enumerate(df.iterrows()):
         doc = {
             "source": source,
             "ext_id": str(row.get("ext_id", "")),
@@ -90,19 +103,29 @@ def build_index(topic: str, source: str, faiss_path: str) -> int:
             "difficulty": row.get("difficulty", None),
         }
 
-        # Insert into Mongo
-        inserted_id = insert_item(doc)  # returns string like "671fd4..."
+        try:
+            inserted_id = insert_item(doc)
+            print(f"[{idx}] Inserted Mongo ID:", inserted_id)
+        except Exception as e:
+            print(f"[{idx}] Mongo insert FAILED:", repr(e))
+            raise
 
-        # Compute unique FAISS-safe numeric_id for *this* row
+        if inserted_id is None:
+            raise RuntimeError("insert_item() returned None")
+
         numeric_id = int(str(inserted_id)[-8:], 16) % (10**8)
 
-        # Persist numeric_id on the same document
-        set_item_numeric_id(inserted_id, numeric_id)
-        
-        # Add to FAISS ids list
+        try:
+            set_item_numeric_id(inserted_id, numeric_id)
+            print(f"[{idx}] numeric_id set:", numeric_id)
+        except Exception as e:
+            print(f"[{idx}] Failed to set numeric_id:", repr(e))
+            raise
+
         ids.append(numeric_id)
 
-    # Sanity check
+    print("Mongo inserts completed. Total:", len(ids))
+
     if len(ids) != n_docs:
         raise ValueError(
             f"IDs count ({len(ids)}) != embeddings count ({n_docs}) "
@@ -110,9 +133,14 @@ def build_index(topic: str, source: str, faiss_path: str) -> int:
         )
 
     # ------------- Build / update FAISS index -------------
+    print("Updating FAISS index...")
+
     store = FaissStore(dim=dim, path=faiss_path)
-    store.load()          # loads existing index if present
+    store.load()
     store.upsert(vecs, ids)
     store.save()
+
+    print("FAISS update complete.")
+    print("=== BUILD INDEX END ===")
 
     return len(ids)
