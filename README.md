@@ -1,6 +1,8 @@
-![frontend](https://github.com/Vsathe99/Course_Recommendation_system/blob/deploy/frontend/src/assets/readme.png)
+
 
 ## Course & Resource Recommendation System using RAG and Hybrid Recommendation Models
+
+![frontend](https://github.com/Vsathe99/Course_Recommendation_system/blob/deploy/frontend/src/assets/readme.png)
 
 ## 📖Table Of Contents
 - Overview
