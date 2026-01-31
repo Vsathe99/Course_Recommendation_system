@@ -38,6 +38,7 @@ coverage/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.prod
 
 # Lock files (optional to ignore if using only one package manager)
 package-lock.json

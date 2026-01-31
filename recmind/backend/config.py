@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     DB_NAME: str = Field(..., min_length=1)
 
     # ----------- App Config ----------- #
-    DATA_DIR: Path = Field(default=Path("./data/raw"))
+    DATA_DIR: Path = Field(default=Path("/data/raw"))
     MAX_PER_SOURCE: int = Field(default=100, ge=1, le=10_000)
     
     RAW_DATA_DIR: Path = Field(default=Path("/data/raw"))

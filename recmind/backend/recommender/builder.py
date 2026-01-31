@@ -89,7 +89,7 @@ def build_index(topic: str, source: str, faiss_path: str) -> int:
     ids: list[int] = []
 
     print("Starting MongoDB inserts...")
-    print("Mongo URI:", settings.MONGO_URI)
+    print("Mongo URI:", settings.MONGO_URL)
 
     for idx, (_, row) in enumerate(df.iterrows()):
         doc = {
