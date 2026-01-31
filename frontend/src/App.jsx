@@ -10,6 +10,7 @@ import Signup from "./pages/Signup.jsx";
 import Login from "./pages/Login.jsx";
 import OAuthSuccess from "./pages/OAuthSuccess.jsx";
 import VerifyEmail from "./pages/VerifyEmail.jsx";
+import HowItWorks from "./pages/HowItWorks.jsx";
 
 /* ================== COMPONENTS ================== */
 import ProtectedRoute from "./components/ProtectedRoutes/ProtectedRoute.jsx";
@@ -45,6 +46,7 @@ function App() {
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/login" element={<Login />} />
         <Route path="/oauth-success" element={<OAuthSuccess />} />
+        <Route path="/how-it-works" element={<HowItWorks />} />
 
         {/* Protected routes */}
         <Route

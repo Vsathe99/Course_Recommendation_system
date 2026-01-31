@@ -129,7 +129,7 @@ function Home() {
             <div className="flex items-center space-x-2">
               <Sparkles className="w-6 h-6 text-[#00ff88]" />
               <span className="text-xl font-bold bg-gradient-to-r from-white to-[#00ff88] bg-clip-text text-transparent">
-                SmartLearn AI
+                CourseMind AI
               </span>
             </div>
 
@@ -239,12 +239,12 @@ function Home() {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <button className="w-full sm:w-auto px-8 py-4 bg-[#00ff88] text-black rounded-lg font-bold text-lg hover:shadow-[0_0_30px_rgba(0,255,136,0.6)] transition-all duration-300 transform hover:scale-105">
-              Explore Recommendations
+              🤖 Let's Chat
             </button>
 
-            <button className="w-full sm:w-auto px-8 py-4 border-2 border-[#00ff88] text-[#00ff88] rounded-lg font-bold text-lg hover:bg-[#00ff88]/10 transition-all duration-300 transform hover:scale-105">
+            <Link to={"/how-it-works"} className="w-full sm:w-auto px-8 py-4 border-2 border-[#00ff88] text-[#00ff88] rounded-lg font-bold text-lg hover:bg-[#00ff88]/10 transition-all duration-300 transform hover:scale-105">
               How It Works
-            </button>
+            </Link>
           </div>
         </div>
       </section>
