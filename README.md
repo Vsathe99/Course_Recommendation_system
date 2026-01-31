@@ -11,23 +11,14 @@
 
 - Features
 
-- Architecture & Core Components
-
 - Project Structure
 
 - REST API Endpoints
 
 - Technology Stack
 
-- Project Highlights & Learning Outcomes
-
-- Use Cases
-
 - Skills Demonstrated
 
-- Troubleshooting
-
-- Database / Data Cleanup
 
 ## 🎯Overview
 Modern learners are overwhelmed by the volume of educational content available across platforms such as GitHub and YouTube. Traditional recommendation systems struggle with cold-start users, while purely content-based approaches fail to adapt to evolving user preferences.
