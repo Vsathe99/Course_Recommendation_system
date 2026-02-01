@@ -198,9 +198,9 @@ function Home() {
               >
                 YouTube Courses
               </a>
-              <button className="w-full px-5 py-2 bg-[#00ff88] text-black rounded-lg font-semibold hover:shadow-[0_0_20px_rgba(0,255,136,0.6)] transition-all duration-300">
+              <Link to={"/signup"} className="w-full px-5 py-2 bg-[#00ff88] text-black rounded-lg font-semibold hover:shadow-[0_0_20px_rgba(0,255,136,0.6)] transition-all duration-300">
                 Get Started
-              </button>
+              </Link>
             </div>
           )}
         </div>
@@ -238,9 +238,9 @@ function Home() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <button className="w-full sm:w-auto px-8 py-4 bg-[#00ff88] text-black rounded-lg font-bold text-lg hover:shadow-[0_0_30px_rgba(0,255,136,0.6)] transition-all duration-300 transform hover:scale-105">
+            <Link to={"/chat"} className="w-full sm:w-auto px-8 py-4 bg-[#00ff88] text-black rounded-lg font-bold text-lg hover:shadow-[0_0_30px_rgba(0,255,136,0.6)] transition-all duration-300 transform hover:scale-105">
               🤖 Let's Chat
-            </button>
+            </Link>
 
             <Link to={"/how-it-works"} className="w-full sm:w-auto px-8 py-4 border-2 border-[#00ff88] text-[#00ff88] rounded-lg font-bold text-lg hover:bg-[#00ff88]/10 transition-all duration-300 transform hover:scale-105">
               How It Works
