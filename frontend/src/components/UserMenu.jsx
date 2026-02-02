@@ -31,8 +31,8 @@ const UserMenu = ({ onSelect, onLogout }) => {
         onClick={handleLogout}
         className="
           w-full px-4 py-2 text-left
-          text-[#00ff88]
-          hover:bg-[#00ff88]
+          text-green-600
+          hover:bg-green-600
           hover:text-white
           transition-colors duration-200
           rounded-b-xl
