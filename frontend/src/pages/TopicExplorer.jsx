@@ -17,6 +17,33 @@ const getItemState = () => {
   }
 };
 
+const rankAndScore = (items) => {
+  if (!items.length) return [];
+
+  // 1️⃣ Sort by CF score (higher is better)
+  const sorted = [...items].sort((a, b) => b.score - a.score);
+
+  const total = sorted.length;
+
+  // 2️⃣ Assign rank-based score
+  return sorted.map((item, index) => {
+    const rank = index + 1;
+
+    // Linear rank score (best = 100, worst = ~0)
+    const rankScore = Math.round(
+      ((total - index) / total) * 100
+    );
+
+    return {
+      ...item,
+      rank,
+      rankScore,       // 👈 THIS is what you show to users
+      isBest: index === 0,
+    };
+  });
+};
+
+
 const setItemState = (itemId, patch) => {
   const state = getItemState();
   state[itemId] = { ...(state[itemId] || {}), ...patch };
@@ -61,7 +88,9 @@ const TopicExplorer = () => {
         query,
       });
 
-      const formatted = data.map((item) => ({
+      const ranked = rankAndScore(data);
+
+      const formatted = ranked.map((item) => ({
         id: item.id, // ideally Mongo _id
         name: item.title,
         desc: item.desc,
