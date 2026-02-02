@@ -15,6 +15,11 @@ export const fetchSavedItems = async () => {
   return data;
 };
 
+export const logoutUser = async () => {
+  const { data } = await api.post("/auth/logout");
+  return data;
+};
+
 export const getLlmSuggestions = async (items) => {
   const { data } = await api.post(
     "/llm/suggestions",
